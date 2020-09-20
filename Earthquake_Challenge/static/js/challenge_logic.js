@@ -15,32 +15,41 @@ let satelliteStreets = L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/sate
 	accessToken: API_KEY
 });
 
+let dark = L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}?access_token={accessToken}', {
+	attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, <a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery (c) <a href="https://www.mapbox.com/">Mapbox</a>',
+	maxZoom: 18,
+	accessToken: API_KEY
+});
+
 // Create the map object with center, zoom level and default layer.
 let map = L.map('mapid', {
 	center: [40.7, -94.5],
 	zoom: 3,
-	layers: [streets]
+	layers: [streets,SatelliteStreets, dark]
 });
 
-// Create a base layer that holds all three maps.
-let baseMaps = {
-  "Streets": streets,
-  "Satellite": satelliteStreets
-};
+
 
 // 1. Add a 2nd layer group for the tectonic plate data.
 let allEarthquakes = new L.LayerGroup();
-let tectonicplates = new L.LayeGroup();
+let tectonicplates = new L.LayerGroup();
+let majorEarthquakedata = new L.LayerGroup();
+
+
+let baseMaps = {
+  "Streets": streets,
+  "Satellite": satelliteStreets,
+  "Dark" : dark
+};
 
 
 // 2. Add a reference to the tectonic plates group to the overlays object.
 let overlays = {
-  "Earthquakes": allEarthquakes
+  "Tectonic Plates": tectonicplates,
+  "Earthquakes": allEarthquakes,
+  "MajorEarthquakedata" : majorEarthquakedata
 };
 
-let overlays = {
-  "Tectonid Plates" : tectonicplates
-};
 
 // Then we add a control to the map that will allow the user to change which
 // layers are visible.
@@ -112,6 +121,49 @@ d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geoj
   // Then we add the earthquake layer to our map.
   allEarthquakes.addTo(map);
 
+
+
+  d3.json("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson").then(function(data) {
+    function styleInfo(feature) {
+      return {
+        fillColor: getColor(feature.properties.mag),
+        radius: getRadius(feature.properties.mag)
+      };
+    }
+
+    function getColor(magnitude) {
+      if (magnitude > 5) {
+        return "#ea2c2c";
+      }
+      if (magnitude > 4) {
+        return "#ea822c";
+      }
+      if (magnitude < 4) {
+        return "#ee9c00";
+      }
+      function getRadius(magnitude) {
+        if (magnitude === 0) {
+          return 1;
+        }
+        return magnitude * 4;
+      }
+
+      L.geoJson(data, {
+        // We turn each feature into a circleMarker on the map.
+        pointToLayer: function(feature, latlng) {
+            console.log(data);
+            return L.circleMarker(latlng);
+          },
+      style: styleInfo,
+      onEachFeature: function(feature, layer) {
+        layer.bindPopup("Magnitude: " + feature.properties.mag + "<br>Location: " + feature.properties.place);
+      }
+    }).addTo(majorEarthquakedata);
+  }
+});
+
+majorEarthquakedata.addTo(map)
+
   // Here we create a legend control object.
 let legend = L.control({
   position: "bottomright"
@@ -149,29 +201,16 @@ legend.onAdd = function() {
   d3.json("https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json").then(function(data) {
     console.log(data);
 
-    function styleInfo(feature) {
-      return {
-        opacity: 1,
-        fillOpacity: 1,
-        fillColor: getColor(feature.properties.mag),
-        color: "#000000",
-        radius: getRadius(feature.properties.mag),
-        stroke: true,
-        weight: 0.7
-      };
-    }
+  L.geoJson(data, { 
+    color: "orange",
+    weight: 2
 
-  L.geoJson(data, {
+  })
     // We turn each feature into a circleMarker on the map.
-    pointToLayer: function(feature, latlng) {
-        console.log(data);
-        return L.circleMarker(latlng);
-      },
-    style: styleInfo,
-    onEachFeature: function(feature, layer) {
-      layer.bindPopup("Magnitude: " + feature.properties.mag + "<br>Location: " + feature.properties.place);
-    }
-  }).addTo(tectonicplates);
+
+.addTo(tectonicplates);
 
 tectonicplates.addTo(map);
 })
+});
+
